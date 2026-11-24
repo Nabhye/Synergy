@@ -1,0 +1,947 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CalSymPy â€” Dose-Response Analysis</title>
+  <!-- KaTeX for LaTeX rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {delimiters:[{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}]})"></script>
+  <style>
+    /* â”€â”€ Reset & base â”€â”€ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0f14;
+      --surface:   #13161e;
+      --surface2:  #1b1f2b;
+      --border:    #242836;
+      --accent:    #4f7cff;
+      --accent2:   #38bdf8;
+      --red:       #e05263;
+      --green:     #34d399;
+      --amber:     #fbbf24;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --radius:    12px;
+      --mono:      "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+      --sans:      "Inter", system-ui, -apple-system, sans-serif;
+      --transition: 200ms cubic-bezier(.4,0,.2,1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* â”€â”€ Top navigation bar â”€â”€ */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      height: 60px;
+      background: rgba(13,15,20,.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .nav-logo {
+      width: 30px;
+      height: 30px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-logo svg { width: 16px; height: 16px; fill: white; }
+
+    .nav-wordmark { font-weight: 700; font-size: 15px; letter-spacing: .3px; }
+    .nav-wordmark span { color: var(--accent); }
+
+    .nav-links { display: flex; gap: 4px; }
+
+    .nav-links a {
+      padding: 6px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      text-decoration: none;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color var(--transition), background var(--transition);
+    }
+
+    .nav-links a:hover, .nav-links a.active { color: var(--text); background: var(--surface2); }
+    .nav-links a.active { color: var(--accent); }
+
+    .nav-badge {
+      font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+      background: rgba(79,124,255,.15); color: var(--accent); border: 1px solid rgba(79,124,255,.3);
+    }
+
+    /* â”€â”€ Page layout â”€â”€ */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+
+    /* â”€â”€ Page headers â”€â”€ */
+    .page-header { margin-bottom: 36px; }
+    .page-header h1 { font-size: 26px; font-weight: 700; letter-spacing: -.3px; margin-bottom: 6px; }
+    .page-header p { color: var(--muted); font-size: 14px; }
+
+    .label-tag {
+      display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: .8px; padding: 3px 10px; border-radius: 20px;
+      background: rgba(79,124,255,.12); color: var(--accent);
+      border: 1px solid rgba(79,124,255,.25); margin-bottom: 12px;
+    }
+
+    /* â”€â”€ Cards â”€â”€ */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border); gap: 12px; flex-wrap: wrap;
+    }
+
+    .card-title { font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .card-title .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+    /* â”€â”€ Toggle button â”€â”€ */
+    .toggle-btn { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+
+    .toggle-btn button {
+      padding: 7px 18px; font-size: 13px; font-weight: 500; font-family: var(--sans);
+      background: transparent; border: none; color: var(--muted); cursor: pointer;
+      transition: background var(--transition), color var(--transition);
+      display: flex; align-items: center; gap: 7px;
+    }
+
+    .toggle-btn button.active { background: var(--accent); color: white; }
+    .toggle-btn button:not(.active):hover { background: var(--surface2); color: var(--text); }
+    .toggle-btn button svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    /* â”€â”€ Graph panel â”€â”€ */
+    .graph-panel {
+      padding: 20px 20px 8px 20px; display: flex; align-items: center;
+      justify-content: center; min-height: 400px; background: #111318;
+    }
+
+    /* â”€â”€ Code panel â”€â”€ */
+    .code-panel { display: none; }
+    .code-panel.visible { display: block; }
+    .graph-panel.hidden { display: none; }
+
+    .code-wrap { position: relative; background: #0a0c10; }
+
+    .code-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; background: #111418; border-bottom: 1px solid var(--border);
+    }
+
+    .code-lang { font-size: 12px; font-weight: 600; color: var(--accent2); text-transform: uppercase; letter-spacing: .6px; }
+
+    .copy-btn {
+      font-size: 12px; font-weight: 500; font-family: var(--sans); padding: 5px 14px;
+      border-radius: 6px; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer; transition: all var(--transition);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .copy-btn:hover { color: var(--text); border-color: var(--accent); }
+    .copy-btn svg { width: 13px; height: 13px; }
+
+    pre {
+      margin: 0; padding: 24px; overflow-x: auto; font-family: var(--mono);
+      font-size: 13px; line-height: 1.7; color: #c9d1d9; max-height: 540px;
+    }
+
+    .kw  { color: #ff79c6; }
+    .cm  { color: #6272a4; font-style: italic; }
+    .st  { color: #f1fa8c; }
+    .fn  { color: #50fa7b; }
+    .nm  { color: #bd93f9; }
+    .op  { color: #ff79c6; }
+
+    /* â”€â”€ Stat row â”€â”€ */
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-top: 24px; }
+
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; position: relative; overflow: hidden;
+    }
+    .stat-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+    .stat-card.blue::before  { background: var(--accent); }
+    .stat-card.red::before   { background: var(--red); }
+    .stat-card.green::before { background: var(--green); }
+    .stat-card.amber::before { background: var(--amber); }
+
+    .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+    .stat-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+    .stat-card.blue .stat-value  { color: var(--accent); }
+    .stat-card.red .stat-value   { color: var(--red); }
+    .stat-card.green .stat-value { color: var(--green); }
+    .stat-card.amber .stat-value { color: var(--amber); }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* â”€â”€ Model comparison table â”€â”€ */
+    .table-wrap { margin-top: 24px; }
+    .table-label { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    thead th {
+      text-align: left; padding: 10px 16px; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .7px; color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background var(--transition); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody td { padding: 11px 16px; vertical-align: middle; }
+
+    .model-pill { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13px; }
+    .model-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .best-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+      background: rgba(52,211,153,.15); color: var(--green); border: 1px solid rgba(52,211,153,.3); margin-left: 6px;
+    }
+
+    .r2-bar-wrap { display: flex; align-items: center; gap: 10px; }
+    .r2-bar { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; max-width: 120px; }
+    .r2-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+
+    /* â”€â”€ Page 2: Mathematics â”€â”€ */
+    .math-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px; margin-bottom: 20px;
+    }
+
+    .math-card-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px; }
+
+    .math-icon {
+      width: 36px; height: 36px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .math-icon svg { width: 18px; height: 18px; }
+    .math-icon.purple { background: rgba(139,92,246,.18); }
+    .math-icon.blue   { background: rgba(79,124,255,.18); }
+    .math-icon.green  { background: rgba(52,211,153,.18); }
+    .math-icon.red    { background: rgba(224,82,99,.18); }
+    .math-icon.amber  { background: rgba(251,191,36,.18); }
+    .math-icon.cyan   { background: rgba(56,189,248,.18); }
+    .math-icon.purple svg { stroke: #a78bfa; }
+    .math-icon.blue   svg { stroke: var(--accent); }
+    .math-icon.green  svg { stroke: var(--green); }
+    .math-icon.red    svg { stroke: var(--red); }
+    .math-icon.amber  svg { stroke: var(--amber); }
+    .math-icon.cyan   svg { stroke: var(--accent2); }
+
+    .math-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+    .math-card .sub { font-size: 12px; color: var(--muted); }
+    .math-card h4 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--accent); margin: 24px 0 10px; }
+    .math-card h4:first-of-type { margin-top: 0; }
+
+    .math-card p { font-size: 14px; color: #94a3b8; line-height: 1.8; margin-bottom: 8px; }
+
+    .formula-block {
+      margin: 14px 0; background: #0a0c10; border: 1px solid var(--border);
+      border-radius: 8px; padding: 16px 20px; font-family: var(--mono);
+      font-size: 13px; color: #bd93f9; line-height: 1.8; overflow-x: auto;
+    }
+    .formula-block .comment { color: var(--muted); font-style: italic; }
+
+    /* KaTeX rendered blocks styling */
+    .katex-display { margin: 16px 0 !important; overflow-x: auto; }
+    .katex { font-size: 1em !important; color: var(--text); }
+
+    /* Warning strip */
+    .warning-strip {
+      margin-top: 28px; display: flex; align-items: flex-start; gap: 14px;
+      background: rgba(251,191,36,.07); border: 1px solid rgba(251,191,36,.2);
+      border-radius: var(--radius); padding: 16px 20px;
+    }
+    .warning-strip svg { width: 18px; height: 18px; stroke: var(--amber); flex-shrink: 0; margin-top: 2px; }
+    .warning-strip p { font-size: 13px; color: #94a3b8; }
+    .warning-strip strong { color: var(--amber); }
+
+    /* â”€â”€ Scrollbar â”€â”€ */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â• NAVIGATION â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<nav>
+  <a class="nav-brand" href="#">
+    <div class="nav-logo">
+      <svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
+    </div>
+    <span class="nav-wordmark">Cal<span>Sym</span>Py</span>
+  </a>
+  <div class="nav-links">
+    <a class="active" onclick="showPage('p1', this)">Analysis</a>
+    <a onclick="showPage('p2', this)">Mathematics</a>
+  </div>
+  <div class="nav-badge">Team-9</div>
+</nav>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â• PAGE 1: ANALYSIS â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<div class="page active" id="p1">
+  <div class="container">
+
+    <div class="page-header">
+      <div class="label-tag">Dose-Response</div>
+      <h1>Curve Fitting Analysis</h1>
+      <p>Four mathematical models fitted to dose-response data. Best model selected by RÂ² and MSE.</p>
+    </div>
+
+    <!-- Graph / Code card -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="dot"></span>
+          Dose vs Response Curve
+        </div>
+        <div class="toggle-btn">
+          <button id="btn-graph" class="active" onclick="showView('graph')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="12" width="4" height="9"/><rect x="10" y="6" width="4" height="15"/>
+              <rect x="17" y="2" width="4" height="19"/>
+            </svg>
+            Graph
+          </button>
+          <button id="btn-code" onclick="showView('code')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+            </svg>
+            Code
+          </button>
+        </div>
+      </div>
+
+      <div class="graph-panel" id="view-graph">
+        <div id="plotly-chart" style="width:100%;height:420px;"></div>
+      </div>
+
+      <div class="code-panel" id="view-code">
+        <div class="code-wrap">
+          <div class="code-toolbar">
+            <span class="code-lang">Python</span>
+            <button class="copy-btn" onclick="copyCode()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+              <span id="copy-label">Copy</span>
+            </button>
+          </div>
+<pre><span class="cm"># CalSymPy - Code Developer Script (Team-9)</span>
+<span class="cm"># Dose-response curve fitting using different mathematical models.</span>
+<span class="cm"># Libraries used: NumPy, Matplotlib and SciPy.</span>
+<span class="cm"># For academic use only - NOT clinical dosing advice.</span>
+
+
+<span class="cm"># Import required libraries</span>
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+<span class="kw">from</span> scipy.optimize <span class="kw">import</span> curve_fit
+
+
+<span class="cm"># 1. DATASET</span>
+<span class="cm"># Dose represents the drug concentration.</span>
+<span class="cm"># Response represents the corresponding therapeutic response.</span>
+<span class="cm"># NaN means that the value is missing.</span>
+
+dose <span class="op">=</span> np.<span class="fn">array</span>([<span class="nm">0.5</span>, <span class="nm">1</span>, <span class="nm">1.5</span>, <span class="nm">2</span>, <span class="nm">2.5</span>, <span class="nm">3</span>, <span class="nm">4</span>, <span class="nm">5</span>, <span class="nm">6</span>, <span class="nm">7</span>,
+                 <span class="nm">8</span>, <span class="nm">9</span>, <span class="nm">10</span>, <span class="nm">12</span>, <span class="nm">15</span>, np.nan])
+
+resp <span class="op">=</span> np.<span class="fn">array</span>([<span class="nm">5.2</span>, <span class="nm">11.8</span>, <span class="nm">18.4</span>, <span class="nm">26.3</span>, <span class="nm">32.1</span>, <span class="nm">38.7</span>, <span class="nm">46.2</span>,
+                 <span class="nm">52.8</span>, <span class="nm">57.6</span>, <span class="nm">61.4</span>, <span class="nm">64.1</span>, <span class="nm">65.9</span>, <span class="nm">67.2</span>,
+                 <span class="nm">68.5</span>, <span class="nm">69.1</span>, <span class="nm">70.0</span>])
+
+
+<span class="cm"># 2. REMOVE INVALID VALUES</span>
+<span class="cm"># Create two empty lists to store valid data.</span>
+X <span class="op">=</span> []
+Y <span class="op">=</span> []
+
+<span class="cm"># Check each dose and response value.</span>
+<span class="cm"># Ignore missing values and doses that are zero or negative.</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="fn">len</span>(dose)):
+    <span class="kw">if not</span> np.<span class="fn">isnan</span>(dose[i]) <span class="kw">and not</span> np.<span class="fn">isnan</span>(resp[i]) <span class="kw">and</span> dose[i] <span class="op">&gt;</span> <span class="nm">0</span>:
+        X.<span class="fn">append</span>(dose[i])
+        Y.<span class="fn">append</span>(resp[i])
+
+<span class="cm"># Convert the lists into NumPy arrays.</span>
+X <span class="op">=</span> np.<span class="fn">array</span>(X)
+Y <span class="op">=</span> np.<span class="fn">array</span>(Y)
+
+<span class="cm"># Display the number of valid data points.</span>
+<span class="fn">print</span>(<span class="st">"Valid data points:"</span>, <span class="fn">len</span>(X))
+
+
+<span class="cm"># 3. DEFINE MATHEMATICAL MODELS</span>
+
+<span class="cm"># Linear model: Represents a straight-line relationship.</span>
+<span class="kw">def</span> <span class="fn">linear</span>(x, m, c):
+    <span class="kw">return</span> m<span class="op">*</span>x <span class="op">+</span> c
+
+<span class="cm"># Quadratic model: Represents a curved or parabolic relationship.</span>
+<span class="kw">def</span> <span class="fn">quadratic</span>(x, a, b, c):
+    <span class="kw">return</span> a<span class="op">*</span>x<span class="op">*</span>x <span class="op">+</span> b<span class="op">*</span>x <span class="op">+</span> c
+
+<span class="cm"># Exponential model: Shows response increasing towards a maximum value.</span>
+<span class="kw">def</span> <span class="fn">exponential</span>(x, ymax, k):
+    <span class="kw">return</span> ymax <span class="op">*</span> (<span class="nm">1</span> <span class="op">-</span> np.<span class="fn">exp</span>(<span class="op">-</span>k<span class="op">*</span>x))
+
+<span class="cm"># Hill model: Represents a saturation-type dose-response relationship.</span>
+<span class="kw">def</span> <span class="fn">hill</span>(x, emax, ec50, n):
+    <span class="kw">return</span> emax <span class="op">*</span> x<span class="op">**</span>n <span class="op">/</span> (ec50<span class="op">**</span>n <span class="op">+</span> x<span class="op">**</span>n)
+
+
+<span class="cm"># 4. FIT ALL MATHEMATICAL MODELS</span>
+
+<span class="cm"># Store each model with its name and initial parameter values.</span>
+<span class="cm"># These initial values help curve_fit start the fitting process.</span>
+models <span class="op">=</span> [
+    (<span class="st">"Linear"</span>, linear, [<span class="nm">1</span>, <span class="nm">1</span>]),
+    (<span class="st">"Quadratic"</span>, quadratic, [<span class="nm">-0.3</span>, <span class="nm">9</span>, <span class="nm">0</span>]),
+    (<span class="st">"Exponential"</span>, exponential, [<span class="nm">70</span>, <span class="nm">0.3</span>]),
+    (<span class="st">"Hill"</span>, hill, [<span class="nm">70</span>, <span class="nm">3</span>, <span class="nm">1.5</span>])
+]
+
+<span class="cm"># Variables to store the best-performing model.</span>
+best_r2 <span class="op">=</span> <span class="nm">-999</span>
+best_name <span class="op">=</span> <span class="st">""</span>
+best_func <span class="op">=</span> <span class="kw">None</span>
+best_params <span class="op">=</span> <span class="kw">None</span>
+
+<span class="fn">print</span>(<span class="st">"\nModel Results"</span>)
+<span class="fn">print</span>(<span class="st">"-------------------------------"</span>)
+
+<span class="cm"># Run a loop to fit and evaluate each model.</span>
+<span class="kw">for</span> name, func, initial <span class="kw">in</span> models:
+
+    <span class="cm"># Find the best parameters for the model using curve fitting.</span>
+    params, _ <span class="op">=</span> <span class="fn">curve_fit</span>(func, X, Y, p0<span class="op">=</span>initial, maxfev<span class="op">=</span><span class="nm">10000</span>)
+
+    <span class="cm"># Calculate the predicted response values.</span>
+    predicted <span class="op">=</span> <span class="fn">func</span>(X, <span class="op">*</span>params)
+
+    <span class="cm"># Calculate the difference between actual and predicted values.</span>
+    error <span class="op">=</span> Y <span class="op">-</span> predicted
+
+    <span class="cm"># Calculate Mean Squared Error (MSE).</span>
+    <span class="cm"># Lower MSE means better prediction accuracy on this dataset.</span>
+    mse <span class="op">=</span> np.<span class="fn">mean</span>(error<span class="op">**</span><span class="nm">2</span>)
+
+    <span class="cm"># Calculate R-squared (R2).</span>
+    <span class="cm"># A value closer to 1 generally indicates a better fit.</span>
+    total <span class="op">=</span> np.<span class="fn">sum</span>((Y <span class="op">-</span> np.<span class="fn">mean</span>(Y))<span class="op">**</span><span class="nm">2</span>)
+    r2 <span class="op">=</span> <span class="nm">1</span> <span class="op">-</span> np.<span class="fn">sum</span>(error<span class="op">**</span><span class="nm">2</span>) <span class="op">/</span> total
+
+    <span class="cm"># Display the results of the current model.</span>
+    <span class="fn">print</span>(<span class="st">"\nModel:"</span>, name)
+    <span class="fn">print</span>(<span class="st">"MSE:"</span>, <span class="fn">round</span>(mse, <span class="nm">4</span>))
+    <span class="fn">print</span>(<span class="st">"R2:"</span>, <span class="fn">round</span>(r2, <span class="nm">4</span>))
+    <span class="fn">print</span>(<span class="st">"Parameters:"</span>, np.<span class="fn">round</span>(params, <span class="nm">4</span>))
+
+    <span class="cm"># Compare the current R2 with the best R2.</span>
+    <span class="cm"># If it is higher, store this model as the best model.</span>
+    <span class="kw">if</span> r2 <span class="op">&gt;</span> best_r2:
+        best_r2 <span class="op">=</span> r2
+        best_name <span class="op">=</span> name
+        best_func <span class="op">=</span> func
+        best_params <span class="op">=</span> params
+
+<span class="cm"># Display the model with the highest R2.</span>
+<span class="fn">print</span>(<span class="st">"\nBest Model:"</span>, best_name)
+
+
+<span class="cm"># 5. FIND DOSE FOR 60% RESPONSE USING EXPONENTIAL MODEL</span>
+
+<span class="cm"># Set the target response to 60%.</span>
+target <span class="op">=</span> <span class="nm">60</span>
+
+<span class="cm"># Fit the exponential model to the dataset.</span>
+exp_params, _ <span class="op">=</span> <span class="fn">curve_fit</span>(exponential, X, Y, p0<span class="op">=</span>[<span class="nm">70</span>, <span class="nm">0.3</span>])
+
+<span class="cm"># Extract the maximum response and growth rate.</span>
+ymax <span class="op">=</span> exp_params[<span class="nm">0</span>]
+k <span class="op">=</span> exp_params[<span class="nm">1</span>]
+
+<span class="cm"># Calculate the required dose using the inverse exponential formula.</span>
+<span class="kw">if</span> target <span class="op">&lt;</span> ymax:
+    required_dose <span class="op">=</span> <span class="op">-</span>np.<span class="fn">log</span>(<span class="nm">1</span> <span class="op">-</span> target<span class="op">/</span>ymax) <span class="op">/</span> k
+    <span class="fn">print</span>(<span class="st">"\nExponential model dose:"</span>, <span class="fn">round</span>(required_dose, <span class="nm">3</span>), <span class="st">"mg/L"</span>)
+<span class="kw">else</span>:
+    <span class="fn">print</span>(<span class="st">"\nTarget response cannot be reached by this model."</span>)
+
+
+<span class="cm"># 6. CALCULATE DOSE USING THE BEST MODEL</span>
+
+<span class="cm"># Initially, no dose has been found.</span>
+dose_found <span class="op">=</span> <span class="kw">None</span>
+
+<span class="cm"># Check different dose values with a small interval of 0.001.</span>
+<span class="cm"># Stop when the predicted response reaches or exceeds 60%.</span>
+<span class="kw">for</span> x <span class="kw">in</span> np.<span class="fn">arange</span>(X.<span class="fn">min</span>(), X.<span class="fn">max</span>(), <span class="nm">0.001</span>):
+    <span class="kw">if</span> <span class="fn">best_func</span>(x, <span class="op">*</span>best_params) <span class="op">&gt;=</span> target:
+        dose_found <span class="op">=</span> x
+        <span class="kw">break</span>
+
+<span class="cm"># Display the calculated dose.</span>
+<span class="kw">if</span> dose_found <span class="kw">is not</span> <span class="kw">None</span>:
+    <span class="fn">print</span>(<span class="st">"Best model dose:"</span>, <span class="fn">round</span>(dose_found, <span class="nm">3</span>), <span class="st">"mg/L"</span>)
+<span class="kw">else</span>:
+    <span class="fn">print</span>(<span class="st">"Target response not reached within the tested range."</span>)
+
+
+<span class="cm"># 7. PLOT THE GRAPH</span>
+
+<span class="cm"># Generate 300 equally spaced dose values for smooth curves.</span>
+xs <span class="op">=</span> np.<span class="fn">linspace</span>(X.<span class="fn">min</span>(), X.<span class="fn">max</span>(), <span class="nm">300</span>)
+
+<span class="cm"># Create a new graph with the specified size.</span>
+plt.<span class="fn">figure</span>(figsize<span class="op">=</span>(<span class="nm">9</span>, <span class="nm">5</span>))
+
+<span class="cm"># Plot the original measured data as black points.</span>
+plt.<span class="fn">scatter</span>(X, Y, color<span class="op">=</span><span class="st">"black"</span>, label<span class="op">=</span><span class="st">"Measured Data"</span>)
+
+<span class="cm"># Plot all four fitted mathematical models.</span>
+<span class="kw">for</span> name, func, initial <span class="kw">in</span> models:
+
+    <span class="cm"># Fit the current model again to get its parameters.</span>
+    params, _ <span class="op">=</span> <span class="fn">curve_fit</span>(func, X, Y, p0<span class="op">=</span>initial, maxfev<span class="op">=</span><span class="nm">10000</span>)
+
+    <span class="cm"># Highlight the exponential model using a red solid line.</span>
+    <span class="kw">if</span> name <span class="op">==</span> <span class="st">"Exponential"</span>:
+        plt.<span class="fn">plot</span>(xs, <span class="fn">func</span>(xs, <span class="op">*</span>params), <span class="st">"r-"</span>, linewidth<span class="op">=</span><span class="nm">3</span>,
+                 label<span class="op">=</span><span class="st">"Exponential"</span>)
+    <span class="kw">else</span>:
+        <span class="cm"># Display the remaining models using dashed lines.</span>
+        plt.<span class="fn">plot</span>(xs, <span class="fn">func</span>(xs, <span class="op">*</span>params), <span class="st">"--"</span>,
+                 label<span class="op">=</span>name)
+
+<span class="cm"># Draw a horizontal line at the target response of 60%.</span>
+plt.<span class="fn">axhline</span>(target, color<span class="op">=</span><span class="st">"gray"</span>, linestyle<span class="op">=</span><span class="st">":"</span>)
+
+<span class="cm"># Add graph title and axis labels.</span>
+plt.<span class="fn">title</span>(<span class="st">"Dose vs Response Curve"</span>)
+plt.<span class="fn">xlabel</span>(<span class="st">"Dose Concentration (mg/L)"</span>)
+plt.<span class="fn">ylabel</span>(<span class="st">"Therapeutic Response (%)"</span>)
+
+<span class="cm"># Display the model names on the graph.</span>
+plt.<span class="fn">legend</span>()
+
+<span class="cm"># Display grid lines for easier reading.</span>
+plt.<span class="fn">grid</span>()
+
+<span class="cm"># Save the graph as an image file.</span>
+plt.<span class="fn">savefig</span>(<span class="st">"calsympy_output.png"</span>)
+
+<span class="fn">print</span>(<span class="st">"\nGraph saved as calsympy_output.png"</span>)
+<span class="fn">print</span>(<span class="st">"WARNING: Academic analysis only - not clinical dosing advice."</span>)
+
+<span class="cm"># Display the final graph.</span>
+plt.<span class="fn">show</span>()</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stat row -->
+    <div class="stat-row">
+      <div class="stat-card blue">
+        <div class="stat-label">Best Model</div>
+        <div class="stat-value" style="font-size:18px;">Exponential</div>
+        <div class="stat-sub">Highest RÂ² across all models</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">RÂ² Score</div>
+        <div class="stat-value">0.9994</div>
+        <div class="stat-sub">Near-perfect fit</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">MSE</div>
+        <div class="stat-value">0.14</div>
+        <div class="stat-sub">Mean squared error</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-label">Dose @ 60%</div>
+        <div class="stat-value">5.47</div>
+        <div class="stat-sub">mg/L (exponential model)</div>
+      </div>
+    </div>
+
+    <!-- Model comparison table -->
+    <div class="card" style="margin-top:24px;">
+      <div class="card-header">
+        <div class="card-title">Model Comparison</div>
+      </div>
+      <div style="padding:4px 0;">
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>MSE</th>
+              <th>RÂ²</th>
+              <th>RÂ² (visual)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="model-pill">
+                  <span class="model-swatch" style="background:#ef4444;"></span>
+                  Exponential
+                </span>
+                <span class="best-badge">Best</span>
+              </td>
+              <td>0.1402</td>
+              <td>0.9994</td>
+              <td>
+                <div class="r2-bar-wrap">
+                  <div class="r2-bar"><div class="r2-bar-fill" style="width:99.94%;"></div></div>
+                  <span style="font-size:12px;color:var(--green);">99.94%</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="model-pill"><span class="model-swatch" style="background:#fb923c;"></span>Quadratic</span></td>
+              <td>7.84</td>
+              <td>0.9697</td>
+              <td>
+                <div class="r2-bar-wrap">
+                  <div class="r2-bar"><div class="r2-bar-fill" style="width:96.97%;"></div></div>
+                  <span style="font-size:12px;color:var(--muted);">96.97%</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="model-pill"><span class="model-swatch" style="background:#34d399;"></span>Hill</span></td>
+              <td>0.68</td>
+              <td>0.9974</td>
+              <td>
+                <div class="r2-bar-wrap">
+                  <div class="r2-bar"><div class="r2-bar-fill" style="width:99.74%;"></div></div>
+                  <span style="font-size:12px;color:var(--muted);">99.74%</span>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="model-pill"><span class="model-swatch" style="background:#60a5fa;"></span>Linear</span></td>
+              <td>78.4</td>
+              <td>0.6998</td>
+              <td>
+                <div class="r2-bar-wrap">
+                  <div class="r2-bar"><div class="r2-bar-fill" style="width:69.98%;"></div></div>
+                  <span style="font-size:12px;color:var(--muted);">69.98%</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /#p1 -->
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â• PAGE 2: MATHEMATICS â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<div class="page" id="p2">
+  <div class="container">
+
+    <div class="page-header">
+      <div class="label-tag">Exponential Model</div>
+      <h1>Mathematical Derivations</h1>
+      <p>Full calculations and derivations for the exponential dose-response model â€” the best-fitting model with RÂ² = 0.9994.</p>
+    </div>
+
+    <!-- Single unified calculations card -->
+    <div class="math-card" id="calculations">
+      <div class="math-card-header">
+        <div class="math-icon purple">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+          </svg>
+        </div>
+        <div>
+          <h3>Exponential Model â€” Full Calculations</h3>
+          <div class="sub">Mathematical derivations and results for the winning dose-response model.</div>
+        </div>
+      </div>
+
+      <!-- 1. The Model -->
+      <h4>1. The Exponential Model</h4>
+      <p>We model the therapeutic response as a saturating exponential â€” a function that rises steeply at low doses, then flattens towards a ceiling:</p>
+      \[ y = y_{\max}\!\left(1 - e^{-k x}\right) \]
+      <p>where <em>x</em> is dose concentration (mg/L), <em>y</em> is therapeutic response (%), <em>y<sub>max</sub></em> is the maximum attainable response, and <em>k</em> is the rate constant controlling how quickly saturation is reached.</p>
+
+      <!-- 2. Data Cleaning -->
+      <h4>2. Data Cleaning</h4>
+      <p>One dose entry is <code style="font-family:var(--mono);font-size:12px;color:#bd93f9;">NaN</code>. Invalid entries are removed before fitting using the condition:</p>
+      <div class="formula-block">
+        Keep row i &nbsp;if:&nbsp; dose[i] â‰  NaN &nbsp;and&nbsp; resp[i] â‰  NaN &nbsp;and&nbsp; dose[i] &gt; 0<br>
+        <span class="comment">â†’ 15 valid data points remain after filtering</span>
+      </div>
+
+      <!-- 3. Curve Fitting -->
+      <h4>3. Curve Fitting (Least-Squares)</h4>
+      <p>Parameters \( y_{\max} \) and \( k \) are found by minimising the sum of squared residuals:</p>
+      \[ \hat\theta = \arg\min_{\theta} \sum_{i=1}^{n} \!\left(y_i - f(x_i;\theta)\right)^2 \]
+      <p>SciPy's <code style="font-family:var(--mono);font-size:12px;color:#50fa7b;">curve_fit</code> implements the <strong style="color:var(--text)">Levenberg-Marquardt</strong> algorithm to solve this iteratively, starting from initial guesses \( y_{\max}^{(0)} = 70 \), \( k^{(0)} = 0.3 \). The fitted parameters are:</p>
+      \[ y_{\max} = 74.052, \qquad k = 0.2352 \]
+
+      <!-- 4. MSE -->
+      <h4>4. Mean Squared Error (MSE)</h4>
+      <p>MSE measures the average squared distance between measured and predicted values. A lower MSE indicates a more accurate model.</p>
+      \[ \text{MSE} = \frac{1}{n}\sum_{i=1}^{n}\!\left(y_i - \hat{y}_i\right)^2 \]
+      <p>Substituting the exponential predictions:</p>
+      \[ \text{MSE}_{\text{exp}} = \frac{1}{15}\sum_{i=1}^{15}\!\left(y_i - 74.052\!\left(1-e^{-0.2352\,x_i}\right)\right)^2 \approx \mathbf{0.14} \]
+
+      <!-- 5. RÂ² -->
+      <h4>5. Coefficient of Determination (RÂ²)</h4>
+      <p>RÂ² measures how much of the data's total variation the model explains. A value of 1 means a perfect fit.</p>
+      \[ R^2 = 1 - \frac{SS_{\text{res}}}{SS_{\text{tot}}} \]
+      <p>where</p>
+      \[ SS_{\text{res}} = \sum_{i=1}^{n}\!\left(y_i - \hat{y}_i\right)^2, \qquad SS_{\text{tot}} = \sum_{i=1}^{n}\!\left(y_i - \bar{y}\right)^2 \]
+      <p>For the exponential model:</p>
+      \[ R^2_{\text{exp}} \approx 1 - \frac{2.10}{3680.4} \approx \mathbf{0.9994} \]
+
+      <!-- 6. Target Dose -->
+      <h4>6. Finding the Dose for a 60 % Response</h4>
+      <p>Rearranging the model equation to solve for dose <em>x</em> given a target response \( y^* \):</p>
+      \[ y^* = y_{\max}\!\left(1 - e^{-kx}\right) \implies e^{-kx} = 1 - \frac{y^*}{y_{\max}} \]
+      \[ \therefore\quad x = -\frac{1}{k}\ln\!\left(1 - \frac{y^*}{y_{\max}}\right) \]
+      <p>Substituting \( y^* = 60 \), \( y_{\max} = 74.052 \), \( k = 0.2352 \):</p>
+      \[ x = -\frac{1}{0.2352}\ln\!\left(1 - \frac{60}{74.052}\right) = -\frac{1}{0.2352}\ln(0.1803) \approx \mathbf{5.47\ \text{mg/L}} \]
+
+      <!-- 7. Half-Life -->
+      <h4>7. Half-Life and Dosing Interval</h4>
+      <p>For a first-order elimination model \( C(t) = C_0\,e^{-kt} \), the half-life is the time for concentration to halve:</p>
+      \[ t_{1/2} = \frac{\ln 2}{k} = \frac{0.6931}{k} \]
+      <p>With the fitted rate constant \( k = 0.2352 \):</p>
+      \[ t_{1/2} = \frac{0.6931}{0.2352} \approx \mathbf{2.95\ \text{h}} \]
+      <p>The dosing interval \( \tau \) required to keep concentration between a minimum \( C_{\min} \) and maximum \( C_{\max} \) is:</p>
+      \[ \tau = \frac{1}{k}\ln\!\left(\frac{C_{\max}}{C_{\min}}\right) \]
+
+      <!-- 8. Log-linear check -->
+      <h4>8. Log-Linear Verification</h4>
+      <p>Taking the natural logarithm of both sides of \( C(t) = C_0\,e^{-kt} \) gives:</p>
+      \[ \ln C = \ln C_0 - k\,t \]
+      <p>This is linear in \( t \) (slope \( = -k \), intercept \( = \ln C_0 \)). If \( \ln C \) plotted against \( t \) produces a straight line, the exponential model is confirmed.</p>
+
+      <!-- 9. Partial Derivatives -->
+      <h4>9. Sensitivity â€” Partial Derivatives</h4>
+      <p>Partial derivatives of \( C(t) = C_0\,e^{-kt} \) describe how sensitive the output is to each parameter:</p>
+      \[ \frac{\partial C}{\partial C_0} = e^{-kt} \]
+      \[ \frac{\partial C}{\partial k} = -C_0\,t\,e^{-kt} \]
+      <p>At \( t = 4\text{ h} \), \( C_0 = 100 \), \( k = 0.2352 \):</p>
+      \[ \frac{\partial C}{\partial C_0}\bigg|_{t=4} = e^{-0.9408} \approx 0.391 \]
+      \[ \frac{\partial C}{\partial k}\bigg|_{t=4} = -100 \times 4 \times e^{-0.9408} \approx -156.3 \]
+      <p>The large magnitude of \( \partial C/\partial k \) indicates the rate constant has the greatest influence on the predicted response.</p>
+
+    </div><!-- /.math-card -->
+
+  </div>
+</div><!-- /#p2 -->
+
+
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<script>
+  // â”€â”€ Exact parameters from scipy curve_fit â”€â”€
+  const X = [0.5,1,1.5,2,2.5,3,4,5,6,7,8,9,10,12,15];
+  const Y = [5.2,11.8,18.4,26.3,32.1,38.7,46.2,52.8,57.6,61.4,64.1,65.9,67.2,68.5,69.1];
+
+  const linear      = (x, m, c)          => m*x + c;
+  const quadratic   = (x, a, b, c)       => a*x*x + b*x + c;
+  const exponential = (x, ymax, k)       => ymax * (1 - Math.exp(-k*x));
+  const hill        = (x, emax, ec50, n) => emax * Math.pow(x,n) / (Math.pow(ec50,n) + Math.pow(x,n));
+
+  const pLinear = [4.545289, 19.475499];
+  const pQuad   = [-0.522994, 11.973282, 3.23498];
+  const pExp    = [74.051844, 0.235163];
+  const pHill   = [75.75564, 2.955087, 1.625302];
+
+  function linspace(a, b, n) {
+    const arr = [], step = (b-a)/(n-1);
+    for (let i=0; i<n; i++) arr.push(a + i*step);
+    return arr;
+  }
+  const xs = linspace(0.5, 15, 300);
+
+  function buildChart() {
+    const measured = {
+      x: X, y: Y, mode: 'markers', type: 'scatter', name: 'Measured Data',
+      marker: { color: '#e2e8f0', size: 8, symbol: 'circle', line: { color: '#0d0f14', width: 1.5 } }
+    };
+    const expTrace = {
+      x: xs, y: xs.map(x => exponential(x, ...pExp)),
+      mode: 'lines', type: 'scatter', name: 'Exponential',
+      line: { color: '#ef4444', width: 3, dash: 'solid' }
+    };
+    const linTrace = {
+      x: xs, y: xs.map(x => linear(x, ...pLinear)),
+      mode: 'lines', type: 'scatter', name: 'Linear',
+      line: { color: '#60a5fa', width: 2, dash: 'dash' }
+    };
+    const quadTrace = {
+      x: xs, y: xs.map(x => quadratic(x, ...pQuad)),
+      mode: 'lines', type: 'scatter', name: 'Quadratic',
+      line: { color: '#fb923c', width: 2, dash: 'dash' }
+    };
+    const hillTrace = {
+      x: xs, y: xs.map(x => hill(x, ...pHill)),
+      mode: 'lines', type: 'scatter', name: 'Hill',
+      line: { color: '#34d399', width: 2, dash: 'dash' }
+    };
+    const target60 = {
+      x: [0.5, 15], y: [60, 60],
+      mode: 'lines', type: 'scatter', name: '60% Target',
+      line: { color: '#64748b', width: 1.5, dash: 'dot' },
+      showlegend: true
+    };
+
+    const layout = {
+      paper_bgcolor: '#111318',
+      plot_bgcolor:  '#111318',
+      font: { family: 'Inter, system-ui, sans-serif', color: '#94a3b8', size: 12 },
+      xaxis: {
+        title: { text: 'Dose Concentration (mg/L)', font: { color: '#64748b' } },
+        gridcolor: '#1b1f2b', zerolinecolor: '#242836',
+        tickfont: { color: '#64748b' }
+      },
+      yaxis: {
+        title: { text: 'Therapeutic Response (%)', font: { color: '#64748b' } },
+        gridcolor: '#1b1f2b', zerolinecolor: '#242836',
+        tickfont: { color: '#64748b' }, range: [0, 90]
+      },
+      legend: {
+        x: 0.02, y: 0.98, bgcolor: 'rgba(13,15,20,0.8)',
+        bordercolor: '#242836', borderwidth: 1
+      },
+      margin: { l: 60, r: 20, t: 20, b: 60 },
+      hovermode: 'x unified'
+    };
+    const config = { responsive: true, displayModeBar: false };
+    Plotly.newPlot('plotly-chart', [measured, expTrace, linTrace, quadTrace, hillTrace, target60], layout, config);
+  }
+
+  document.addEventListener('DOMContentLoaded', buildChart);
+
+  function showPage(id, link) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    link.classList.add('active');
+  }
+
+  function showView(view) {
+    const graph = document.getElementById('view-graph');
+    const code  = document.getElementById('view-code');
+    const btnG  = document.getElementById('btn-graph');
+    const btnC  = document.getElementById('btn-code');
+    if (view === 'graph') {
+      graph.classList.remove('hidden'); code.classList.remove('visible');
+      btnG.classList.add('active');    btnC.classList.remove('active');
+    } else {
+      graph.classList.add('hidden');   code.classList.add('visible');
+      btnC.classList.add('active');    btnG.classList.remove('active');
+    }
+  }
+
+  function copyCode() {
+    const raw = `# CalSymPy - Code Developer Script (Team-9)
+# Dose-response curve fitting using different mathematical models.
+# Libraries used: NumPy, Matplotlib and SciPy.
+# For academic use only - NOT clinical dosing advice.
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+dose = np.array([0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, np.nan])
+resp = np.array([5.2, 11.8, 18.4, 26.3, 32.1, 38.7, 46.2, 52.8, 57.6, 61.4, 64.1, 65.9, 67.2, 68.5, 69.1, 70.0])
+
+X, Y = [], []
+for i in range(len(dose)):
+    if not np.isnan(dose[i]) and not np.isnan(resp[i]) and dose[i] > 0:
+        X.append(dose[i]); Y.append(resp[i])
+X, Y = np.array(X), np.array(Y)
+
+def linear(x, m, c): return m*x + c
+def quadratic(x, a, b, c): return a*x*x + b*x + c
+def exponential(x, ymax, k): return ymax * (1 - np.exp(-k*x))
+def hill(x, emax, ec50, n): return emax * x**n / (ec50**n + x**n)
+
+models = [("Linear", linear, [1, 1]), ("Quadratic", quadratic, [-0.3, 9, 0]),
+          ("Exponential", exponential, [70, 0.3]), ("Hill", hill, [70, 3, 1.5])]
+
+best_r2, best_name, best_func, best_params = -999, "", None, None
+for name, func, initial in models:
+    params, _ = curve_fit(func, X, Y, p0=initial, maxfev=10000)
+    predicted = func(X, *params)
+    error = Y - predicted
+    mse = np.mean(error**2)
+    r2 = 1 - np.sum(error**2) / np.sum((Y - np.mean(Y))**2)
+    print(f"Model: {name}  MSE: {round(mse,4)}  R2: {round(r2,4)}")
+    if r2 > best_r2:
+        best_r2, best_name, best_func, best_params = r2, name, func, params
+
+print("Best Model:", best_name)
+
+target = 60
+exp_params, _ = curve_fit(exponential, X, Y, p0=[70, 0.3])
+ymax, k = exp_params[0], exp_params[1]
+if target < ymax:
+    required_dose = -np.log(1 - target/ymax) / k
+    print("Exponential model dose:", round(required_dose, 3), "mg/L")
+
+xs = np.linspace(X.min(), X.max(), 300)
+plt.figure(figsize=(9, 5))
+plt.scatter(X, Y, color="black", label="Measured Data")
+for name, func, initial in models:
+    params, _ = curve_fit(func, X, Y, p0=initial, maxfev=10000)
+    if name == "Exponential":
+        plt.plot(xs, func(xs, *params), "r-", linewidth=3, label="Exponential")
+    else:
+        plt.plot(xs, func(xs, *params), "--", label=name)
+plt.axhline(target, color="gray", linestyle=":")
+plt.title("Dose vs Response Curve")
+plt.xlabel("Dose Concentration (mg/L)")
+plt.ylabel("Therapeutic Response (%)")
+plt.legend(); plt.grid()
+plt.savefig("calsympy_output.png")
+plt.show()`;
+    navigator.clipboard.writeText(raw).then(() => {
+      const lbl = document.getElementById('copy-label');
+      lbl.textContent = 'Copied';
+      setTimeout(() => lbl.textContent = 'Copy', 2000);
+    });
+  }
+</script>
+</body>
+</html>
+
